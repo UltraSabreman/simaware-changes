@@ -85,6 +85,7 @@ function returnFromAirport()
     {
         map.addLayer(plane_featuregroup);
     }
+    window.history.pushState('home', 'home', '/');
     $('#airport-sidebar').hide();
 }
 
@@ -126,6 +127,18 @@ function updateAirportFlights(airports, flights, icao)
     $('#depcount').html(depscount);
     $('#arrcount').html(arrscount);
 
+}
+
+function getAirportLoad(icao)
+{
+    var ct = 0;
+    $.each(flights, (idx, obj) => {
+        if(obj.dep == icao || obj.arr == icao)
+        {
+            ct++;
+        }
+    })
+    return ct;
 }
 
 function getAirportDetails(airports, icao)

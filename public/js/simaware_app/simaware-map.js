@@ -7,6 +7,55 @@ const warnings = {
     'EGGX0': 'Oceanic clearance required for entry.  See ganderoceanic.ca for more information.',
 }
 
+const wf = [
+    'YSSY',
+    'YBBN',
+    'AYPY',
+    'WAJJ',
+    'WAAA',
+    'WBKK',
+    'VVTS',
+    'VTCC',
+    'VNKT',
+    'VABB',
+    'OOMS',
+    'HSSK',
+    'HKJK',
+    'FMMI',
+    'FAKM',
+    'FNLU',
+    'DGAA',
+    'GVAC',
+    'GCXO',
+    'LEMG',
+    'LIRF',
+    'LGTS',
+    'EPKK',
+    'EETN',
+    'ENTC',
+    'EKYT',
+    'EBBR',
+    'EGPK',
+    'BIKF',
+    'BGBW',
+    'CYQX',
+    'TXKF',
+    'MYNN',
+    'MWCR',
+    'SKBG',
+    'SEQM',
+    'SLLP',
+    'SCEL',
+    'SCIP',
+    'NTAA',
+    'NCRG',
+    'NFFN',
+    'NZAA',
+    'NZCH',
+    'YMML',
+    'YSSY'
+]
+
 // Initializes the map in the #map container
 function initializeMap(manual = 0, landscape = 0)
 {
@@ -46,6 +95,11 @@ function initializeMap(manual = 0, landscape = 0)
         basemap = L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_nolabels/{z}/{x}/{y}{r}.png', { attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a> | <a href="https://github.com/maiuswong/simaware-express"><i class="fab fa-github"></i> SimAware on GitHub</a> | <b>Not for real-world navigation.</b>', subdomains: 'abcd'}).addTo(map);
         map.attributionControl.setPosition('topright');
 
+        if ($.cookie('mapView')) {
+            var mapView = JSON.parse($.cookie('mapView'));
+            map.setView([mapView.lat, mapView.lng], mapView.zoom, true);
+        }
+
         // Make the search box clickable
         $.each(['controls', 'flights-sidebar', 'search-field', 'user-sidebar', 'footer-background', 'streamers-bar'], (idx, obj) => {
             el = document.getElementById(obj);
@@ -56,6 +110,14 @@ function initializeMap(manual = 0, landscape = 0)
             }
         })
 
+        map.on('moveend', function(e) {
+            var view = {
+                lat: map.getCenter().lat,
+                lng: map.getCenter().lng,
+                zoom: map.getZoom()
+            };
+            $.cookie('mapView', JSON.stringify(view));
+        });
         // Set onclick functions
         map.on('click', function() {
             if(map.hasLayer(active_featuregroup))
@@ -72,15 +134,16 @@ function initializeMap(manual = 0, landscape = 0)
     }
 
     // Set FeatureGroups
-        plane_featuregroup = new L.FeatureGroup();
-        if(!manual) { map.addLayer(plane_featuregroup); }
-        atc_featuregroup = new L.FeatureGroup();
-        active_featuregroup = new L.FeatureGroup();
-        tracons_featuregroup = new L.FeatureGroup();
-        locals_featuregroup = new L.FeatureGroup();
-        sigmets_featuregroup = new L.FeatureGroup();
-        events_featuregroup = new L.FeatureGroup();
-        nats_featuregroup = new L.FeatureGroup();
+    plane_featuregroup = new L.FeatureGroup();
+    if(!manual) { map.addLayer(plane_featuregroup); }
+    atc_featuregroup = new L.FeatureGroup();
+    active_featuregroup = new L.FeatureGroup();
+    tracons_featuregroup = new L.FeatureGroup();
+    locals_featuregroup = new L.FeatureGroup();
+    sigmets_featuregroup = new L.FeatureGroup();
+    events_featuregroup = new L.FeatureGroup();
+    nats_featuregroup = new L.FeatureGroup();
+    wf_featuregroup = new L.FeatureGroup();
 }
 
 // Tells Leaflet what icons are available
@@ -89,6 +152,29 @@ function initializeIcons()
     var icons_list = ['B739'];
     $.each(icons_list, function(idx, icon) {
         icons_array[icon] = new L.divIcon({ className: icon, iconSize: [18, 18] , iconAnchor: [9, 9]});
+    })
+}
+
+function initializeWorldFlight()
+{
+    $.each(wf, (idx, obj) => {
+        if(idx > 0)
+        {
+            var oldap = airports[wf[idx - 1]];
+            if(getAirportLoad(oldap.icao) > 20)
+            {
+                var ln = new L.Wrapped.Polyline([[oldap.lat, oldap.lon], [airports[obj].lat, airports[obj].lon]], {color: '#ffcc33', weight: 5, opacity: 1, nowrap: true});
+            }
+            else
+            {
+                var ln = new L.Wrapped.Polyline([[oldap.lat, oldap.lon], [airports[obj].lat, airports[obj].lon]], {color: '#fff', weight: 5, opacity: 0.5, nowrap: true});
+            }
+            wf_featuregroup.addLayer(ln)
+        }
+        var di = new L.divIcon({className: 'simaware-ap-tooltip', html: getWfTooltip(airports[obj]), iconSize: 'auto'});
+        var oloc = new L.marker([airports[obj].lat, airports[obj].lon],{ icon: di, });
+        console.log(idx);
+        wf_featuregroup.addLayer(oloc);
     })
 }
 
@@ -113,11 +199,11 @@ function getBadge(rating)
     {
         case 1:
             txt = 'PPL'; break;
-        case 2:
-            txt = 'IFR'; break;
         case 3:
+            txt = 'IFR'; break;
+        case 7:
             txt = 'CMEL'; break;
-        case 4:
+        case 15:
             txt = 'ATPL'; break;
     }
     if(txt.length)
@@ -133,10 +219,15 @@ function getBadge(rating)
 function initializeAirports()
 {
     airportsByIata = [];
+    airportsByPrefix = [];
     $.getJSON(dataserver + 'api/livedata/airports.json', function(data){ 
         airports = data;
         $.each(airports, (idx, obj) => {
             airportsByIata[obj.iata] = obj;
+            if(obj.prefix)
+            {
+                airportsByPrefix[obj.prefix] = obj;
+            }
         })
     })
 }
@@ -445,7 +536,10 @@ function markFIR(obj)
 
 function airportSearch(str)
 {
-    var aus_consts =  ['YS', 'YP', 'YM', 'YB'];
+    if(airportsByPrefix[str])
+    {
+        return airportsByPrefix[str];
+    }
     if(airports[str])
     {
         return airports[str];
@@ -453,17 +547,6 @@ function airportSearch(str)
     else if(airportsByIata[str]) // USA
     {
         return airportsByIata[str];
-    }
-    for(id in aus_consts)
-    {
-        if(airports[aus_consts[id] + str])
-        {
-            return airports[aus_consts[id] + str];
-        }
-    }
-    if(airports['Y' + str[0] + str])
-    {
-        return airports['Y' + str[0] + str];
     }
 }
 
@@ -1260,7 +1343,7 @@ function dehighlightSigmet(index)
 // Get Local Tooltip
 // function getLocalTooltip(obj)
 // {
-//     var tt = '<table class="bg-white" style="font-family: \'Jost\', sans-serif; font-size: 0.7rem; border-radius: 1rem; overflow: hidden;"><tr><td style="padding: 0px 5px;">'+obj.loc.icao+'</td>';
+//     var tt = '<table class="bg-white" style="font-family: \'Figtree\', sans-serif; font-size: 0.7rem; border-radius: 1rem; overflow: hidden;"><tr><td style="padding: 0px 5px;">'+obj.loc.icao+'</td>';
 //     if(obj.DEL)
 //     {
 //         tt += '<td class="text-white bg-primary" style="padding: 0px 5px">D</td>';
@@ -1298,7 +1381,7 @@ function getLocalTooltip(icao)
     ct = 0;
     tt = '';
     let icao_text_style = 'text-white-50'; // ATC offline
-    let icao_background_color = 'rgba(0,0,0,0.1)'
+    let icao_background_color = 'rgba(0,0,0,0)'
     if(obj.DEL)
     {
         tt += '<td class="text-white" style="background-color: '+blue+'; text-align: center; padding: 0px 5px">D</td>';
@@ -1348,7 +1431,7 @@ function getLocalTooltip(icao)
         {
             style = 'border: 2px solid rgba(218,41,46,0.25);background-color: rgba(0,0,0,0.25)'; // In >1 week
         }
-        event = '<div style="position: absolute; top: -5; left: -5; border-radius: 5px; width: 10; height: 10; '+style+'"></div>';
+        event = '<div style="position: absolute; top: -5px; left: -5px; border-radius: 5px; width: 10px; height: 10px; '+style+'"></div>';
     }
     var tt = '<div ondblclick="zoomToAirport(\''+icao+'\', true)" style="position: relative; background-color: '+icao_background_color+'; display: flex; flex-direction: column; justify-content: center;">'+event+'<table style="margin: 0.2rem; align-self: center; font-family: \'JetBrains Mono\', sans-serif; font-size: 0.6rem; overflow: hidden; font-weight: bold"><tr><td colspan="'+ct+'" class="'+icao_text_style+'" style="padding: 0px 5px">'+obj.loc.icao+'</td></tr></table>'+tt+'</div>';
 
@@ -1695,6 +1778,20 @@ function toggleStreamers()
     {
         $('#streamers-bar').removeClass('d-none').addClass('d-flex');
         $('.map-button#streamers').addClass('map-button-active');
+    }
+}
+
+function toggleWorldflight()
+{
+    if(map.hasLayer(wf_featuregroup))
+    {
+        $('.map-button#wf').removeClass('map-button-active');
+        map.removeLayer(wf_featuregroup);
+    }
+    else
+    {
+        $('.map-button#wf').addClass('map-button-active');
+        map.addLayer(wf_featuregroup);
     }
 }
 
