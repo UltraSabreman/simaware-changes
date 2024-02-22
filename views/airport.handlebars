@@ -10,13 +10,13 @@
     {{> footer}}
 </div>
 <script>
-$(document).ready(function() {
+$(document).ready(async function() {
 
     airports = [];
     flights = [];
     manual = false;
 
-    initialize();
+    await initialize();
     setInterval(
         async () => { 
             flights = await refreshFlights(filterName, filterCriteria); 
@@ -31,16 +31,16 @@ async function initialize()
     filterName = 'airport';
     filterCriteria = '{{ icao }}';
 
-    initializeMap(false);
+    await initializeMap(false);
 
-    response = await fetch('/livedata/airports.json');
+    response = await fetchRetry('/livedata/airports.json');
     airports = await response.json();
     flights = await refreshFlights(filterName, filterCriteria);
     eventsByAirport = await loadUpcomingEvents();
 
     initializeAirport('{{ icao }}');
     initializeNexrad();
-    initializeATC();
+    await initializeATC();
     initializeAirports();
     refreshATC();
     initializeInfobar();

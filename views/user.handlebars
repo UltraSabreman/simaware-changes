@@ -23,14 +23,14 @@ async function initialize()
 {
     // Set-up airport only
 
-    initializeMap();
+    await initializeMap();
     map.removeLayer(plane_featuregroup);
     refreshFlights();
     initializeUser({{ cid }});
 
     manual = 1;
 
-    response = await fetch('/livedata/airports.json');
+    response = await fetchRetry('/livedata/airports.json');
     airports = await response.json();
 }
 </script>

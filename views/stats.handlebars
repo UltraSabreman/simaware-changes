@@ -14,7 +14,7 @@
                 <div class="tab-content" id="nav-tabContent">
                     <div class="tab-pane show active" id="nav-home" role="tabpanel" aria-labelledby="nav-home-tab">
                         <div class="table-responsive-xl">
-                            <table class="small table table-dark table-hover table-bordered" style="min-width: 900px">
+                            <table class="small table border-secondary text-white table-hover table-bordered" style="min-width: 900px">
                                 <thead>
                                     <tr>
                                         <th>Callsign</th>
@@ -31,7 +31,7 @@
                         </div>
                     </div>
                     <div class="tab-pane" id="nav-profile" role="tabpanel" aria-labelledby="nav-profile-tab">
-                        <table class="small table table-dark table-hover table-bordered">
+                        <table class="small table border-secondary text-white table-hover table-bordered">
                             <thead>
                                 <tr>
                                     <th>Callsign</th>
@@ -46,7 +46,7 @@
                         </table>
                     </div>
                     <div class="tab-pane" id="nav-contact" role="tabpanel" aria-labelledby="nav-contact-tab">
-                        <table class="small table table-dark table-hover table-bordered">
+                        <table class="small table border-secondary text-white table-hover table-bordered">
                             <thead>
                                 <tr>
                                     <th style="width: 6%; text-align: center; vertical-align: middle"><i class="fas fa-medal"></i></th>
@@ -62,7 +62,7 @@
                         </table>
                     </div>
                     <div class="tab-pane" id="nav-aircraft" role="tabpanel" aria-labelledby="nav-aircraft-tab">
-                        <table class="small table table-dark table-hover table-bordered">
+                        <table class="small table border-secondary text-white table-hover table-bordered">
                             <thead>
                                 <tr>
                                     <th style="width: 6%; text-align: center; vertical-align: middle"><i class="fas fa-medal"></i></th>
@@ -84,7 +84,7 @@
 </div>
 <script>
 
-$(document).ready(function() {
+$(document).ready(async function() {
 
     airports = [];
     flights = [];
@@ -94,7 +94,7 @@ $(document).ready(function() {
     filterName = null;
     filterCriteria = null;
 
-    initialize();
+    await initialize();
 
     setInterval(
         async () => { 
@@ -113,23 +113,22 @@ $(document).ready(function() {
 async function initialize()
 {
     await initializePatrons();
-    initializeMap(1);
+    await initializeMap(1);
 
-    response = await fetch('/livedata/airports.json');
+    response = await fetchRetry('/livedata/airports.json');
     airports = await response.json();
     flights = await refreshFlights(filterName, filterCriteria);
     eventsByAirport = await loadUpcomingEvents();
     airlines = await loadAirlines();
     aircraft = await loadAircraft();
 
+    await initializeFirData();
     initializeNexrad();
-    initializeATC();
+    await initializeATC();
     initializeAirports();
     refreshATC();
     initializeInfobar();
-    updateSigmet();
 
-    {{!-- console.log('FLAG' + !$.trim($('#atc').html()).length) --}}
     if(!$.trim($('#atc').html()).length)
     {
         refreshStats();
@@ -138,7 +137,6 @@ async function initialize()
 
 async function refreshStats()
 {
-    await refreshATC();
     flights = await refreshFlights();
 
     let html = '';
@@ -153,9 +151,7 @@ async function refreshStats()
 
     html = '';
     $.each(sectors, (idx, sector) => {
-        {{!-- console.log(sector.callsign); --}}
         let index = getFirIndexByCallsign(sector.callsign);
-        console.log(sector);
         let fir = firSearch(sector.callsign);
         if(fir && index)
         {
@@ -165,12 +161,12 @@ async function refreshStats()
         {
             var firname = 'Unknown Sector';
         }
+        console.log(fir);
         html += '<tr class="atcrow"><td>'+sector.callsign+'</td><td>'+firname+'</td><td>'+sector.freq+'</td><td>'+sector.name+'</td></tr>';
     })
     $.each(tracons, (idx, tracon) => {
 
         var search = traconSearch(tracon.callsign);
-        console.log(tracon.callsign);
         if(search !== null)
         {
             if(search[1] == 'circles')
@@ -215,7 +211,7 @@ async function refreshStats()
     html = '';
     var airlineCount = {};
     $.each(airlines, (idx, airline) => {
-        airlineCount[airline.icao] = 0;
+        airlineCount[airline[0].icao] = 0;
     })
     var airlineKeys = Object.keys(airlines);
     $.each(flights, (idx, flight) => {
@@ -243,7 +239,37 @@ async function refreshStats()
             html += '</td><td style="text-align: center">';
             if(airline[1] == 0) { html += '<span class="text-muted">'+ airline[1] +'</span>'; }
             else { html += airline[1]; }
-            html += '</td><td style="text-align: center">'+airline[0]+'</td><td style="text-align: center">'+airlines[airline[0]].iata+'</td><td>' + airlines[airline[0]].name + '</td><td>'+ airlines[airline[0]].callsign + '</td><td>'+ airlines[airline[0]].country + '</td></tr>';
+            html += '</td><td style="text-align: center">'+airline[0]+'</td>'
+
+            html += '<td style="text-align: center">'
+            var s = []
+            for(var i in airlines[airline[0]])
+            {
+                s.push(airlines[airline[0]][i].iata);
+            }
+            html += s.join('<br>');
+
+            html += '</td><td>'
+            var s = []
+            for(var i in airlines[airline[0]])
+            {
+                s.push(airlines[airline[0]][i].name);
+            }
+            html += s.join('<br>');
+            html += '</td><td>'
+            var s = []
+            for(var i in airlines[airline[0]])
+            {
+                s.push(airlines[airline[0]][i].callsign);
+            }
+            html += s.join('<br>');
+            html += '</td><td>'
+            var s = []
+            for(var i in airlines[airline[0]])
+            {
+                s.push(airlines[airline[0]][i].country);
+            }
+            html += s.join('<br>') + '</td></tr>';
         }
     })
     $('#airlines').html(html);

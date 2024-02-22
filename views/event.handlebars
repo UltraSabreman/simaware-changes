@@ -1,3 +1,6 @@
+<!-- Events Analysis -->
+{{> events-analysis}}
+
 <div id="map" class="d-flex" style="min-height: 0; flex-grow: 1">
 
     <!-- Events Sidebar -->
@@ -11,7 +14,7 @@
 </div>
 <script>
 
-$(document).ready(function() {
+$(document).ready(async function() {
 
     airports = [];
     flights = [];
@@ -24,14 +27,13 @@ $(document).ready(function() {
     filterName = null;
     filterCriteria = null;
 
-    initialize();
+    await initialize();
     setInterval(
         async () => { 
 
             await refreshATC();
             flights = await refreshFlights(filterName, filterCriteria);
             updateInfobar();
-            updateSigmet();
             setLayerOrder();
             
         }, 60 * 1000);
@@ -39,9 +41,9 @@ $(document).ready(function() {
 
 async function initialize()
 {
-    initializeMap(manual, landscape);
+    await initializeMap(manual, landscape);
 
-    response = await fetch('/livedata/airports.json');
+    response = await fetchRetry('/livedata/airports.json');
     airports = await response.json();
     flights = await refreshFlights(filterName, filterCriteria);
     eventsByAirport = await loadUpcomingEvents();
@@ -54,7 +56,6 @@ async function initialize()
     await initializeAirports();
     await refreshATC();
     await initializeInfobar();
-    await updateSigmet();
     loadEvent(eventid);
 }
 </script>

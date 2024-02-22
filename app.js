@@ -9,12 +9,11 @@ const minify = require('express-minify');
 // Init middleware
 app.engine('handlebars', exphbs({defaultLayout: 'main'}));
 app.set('view engine', 'handlebars');
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5000;
 
 // Include the public folder as static
 // app.use(minify());
 app.use(express.static(path.join(__dirname, 'public')));
-
 
 /* Index Page */
 app.get('/', (req, res) => {
@@ -43,7 +42,14 @@ app.get('/events/', (req, res) => {
 
 /* Events View Page */
 app.get('/event/:id', (req, res) => {
-    res.render('event', {id: req.params.id});
+    if(req.params.id < 1000)
+    {
+        res.render('legacyevent', {id: req.params.id});
+    }
+    else
+    {
+        res.render('event', {id: req.params.id})
+    }
 })
 
 /* Events Analysis Page */
